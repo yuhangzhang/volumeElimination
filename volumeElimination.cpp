@@ -23,7 +23,14 @@ volumeElimination::volumeElimination(int row, int col, int height)
 
 void volumeElimination::addDataterm(int i, int j, int k, double v)
 {
-	_dataterm[i][j][k] = v;
+	_dataterm[i][j][k] += v;
+
+	return;
+}
+
+void volumeElimination::addDataterm(int i, int j, int k, double v0, double v1)
+{
+	_dataterm[i][j][k] += v1-v0;
 
 	return;
 }
@@ -65,8 +72,12 @@ double volumeElimination::getEdgeterm(int i, int j, int k, int i2, int j2, int k
 
 void volumeElimination::minimize()
 {
+	printf("in2\n");
+
 	int numnode = _dataterm.size()*_dataterm[0].size()*_dataterm[0][0].size();
 	QPBO<double>* solver = new QPBO<double>(numnode,numnode*3);
+
+	printf("numnode=%d\n",numnode);
 
 	solver->AddNode(numnode);
 
@@ -76,7 +87,7 @@ void volumeElimination::minimize()
 		{
 			for(int k=0;k<_dataterm[i][j].size();k++)
 			{
-				solver->AddUnaryTerm(i*_dataterm[i].size()+j*_dataterm[i][j].size()+k,0,_dataterm[i][j][k]);
+				solver->AddUnaryTerm(i*_dataterm[i].size()*_dataterm[i][j].size()+j*_dataterm[i][j].size()+k,0,_dataterm[i][j][k]);
 			}
 		}
 	}
@@ -85,46 +96,52 @@ void volumeElimination::minimize()
 	{
 		vector<int> index = it->first;
 
+		//printf("%d %d %d, %d %d %d, %f\n",index[0],index[1],index[2],index[3],index[4],index[5],it->second);//getchar();
+
 		solver->AddPairwiseTerm(
-			index[0]*_dataterm[0].size()+index[1]*_dataterm[0][0].size()+index[2],
-			index[3]*_dataterm[0].size()+index[4]*_dataterm[0][0].size()+index[5],
+			index[0]*_dataterm[0].size()*_dataterm[0][0].size()+index[1]*_dataterm[0][0].size()+index[2],
+			index[3]*_dataterm[0].size()*_dataterm[0][0].size()+index[4]*_dataterm[0][0].size()+index[5],
 			0,0,0,it->second
 			);
 		
 	}
 
+	printf("start solving...");
 	solver->Solve();
+	printf("finished!\n");
 	solver->ComputeWeakPersistencies();
+
 
 	for(int i=0;i<_label.size();i++)
 	{
 		for(int j=0;j<_label[i].size();j++)
 		{
 			for(int k=0;k<_label[i][j].size();k++)
-			{
-				_label[i][j][k] = solver->GetLabel(i*_label[i].size()+j*_label[i][j].size()+k);
-				
+			{                             
+				_label[i][j][k] = solver->GetLabel(i*_label[i].size()*_label[i][j].size()+j*_label[i][j].size()+k);
+				//printf("(%d,%d)",int(_label[i][j][k]),solver->GetLabel(i*_label[i].size()*_label[i][j].size()+j*_label[i][j].size()+k));
+				//if(_label[i][j][k]!=0&&_label[i][j][k]!=1) exit(0);
 			}
 		}
 	}
 
 	solver->Reset();
-
+	printf("in3\n");
 	return;
 }
 
-void volumeElimination::setLabel(int i, int j, int k, bool v)
+void volumeElimination::setLabel(int i, int j, int k, int v)
 {
 	 _label[i][j][k] = v;
 	 return;
 }
 
-bool volumeElimination::getLabel(int i, int j, int k)
+int volumeElimination::getLabel(int i, int j, int k)
 {
 	return _label[i][j][k];
 }
 
-volumeElimination::vector3b volumeElimination::getLabel()
+volumeElimination::vector3i volumeElimination::getLabel()
 {
 	return _label;
 }
